@@ -37,8 +37,16 @@
           <h1 class="text-2xl font-semibold tracking-tight">This QR code is protected</h1>
           <p class="mt-2 text-sm text-muted-foreground">Enter the PIN from the person who shared it.</p>
         </div>
-        <input id="pin" type="password" autocomplete="off" placeholder="PIN" autofocus
-               class="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300" />
+        <input
+  id="pin"
+  type="password"
+  inputmode="numeric"
+  pattern="[0-9]*"
+  autocomplete="off"
+  placeholder="PIN"
+  autofocus
+  class="flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300"
+/>
         <p id="err" class="hidden text-sm text-red-600"></p>
         <button class="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-neutral-700">Unlock</button>
       </form>
