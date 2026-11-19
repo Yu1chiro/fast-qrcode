@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create QR card — fast-qrcode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          border: '#e5e5e5', background: '#ffffff', foreground: '#0a0a0a',
+          muted: { DEFAULT: '#f5f5f5', foreground: '#737373' },
+          primary: { DEFAULT: '#171717', foreground: '#fafafa' }
+        },
+        fontFamily: { sans: ['Geist', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
+      } }
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer components {
+      .btn { @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-10 px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none; }
+      .btn-primary { @apply bg-primary text-primary-foreground hover:bg-neutral-700; }
+      .btn-outline { @apply border border-border bg-white hover:bg-muted; }
+      .field { @apply flex h-10 w-full rounded-md border border-border bg-white px-3 text-sm placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300; }
+      .label { @apply mb-2 block text-sm font-medium; }
+      .help { @apply mt-2 text-xs text-muted-foreground; }
+      .seg { @apply inline-flex rounded-md bg-muted p-1 text-sm; }
+      .seg button { @apply rounded px-3 py-1 text-muted-foreground transition; }
+      .seg button.on { @apply bg-white text-foreground shadow-sm; }
+    }
+  </style>
+  <style>
+    .ql-toolbar.ql-snow { border-color: #e5e5e5; border-radius: 6px 6px 0 0; background: #fafafa; font-family: inherit; }
+    .ql-container.ql-snow { border-color: #e5e5e5; border-radius: 0 0 6px 6px; font-family: inherit; font-size: 14px; min-height: 140px; }
+    .ql-editor { min-height: 140px; }
+    .ql-editor.ql-blank::before { color: #a3a3a3; font-style: normal; }
+    input[type=color] { -webkit-appearance: none; appearance: none; width: 40px; height: 40px; padding: 0; border: 1px solid #e5e5e5; border-radius: 6px; background: none; cursor: pointer; }
+    input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+    input[type=color]::-webkit-color-swatch { border: none; border-radius: 4px; }
+    input[type=range] { accent-color: #171717; }
+    .dots { background-image: radial-gradient(#d4d4d4 1px, transparent 1px); background-size: 18px 18px; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+</head>
+<body class="bg-background text-foreground font-sans antialiased">
+
+  <header class="border-b border-border">
+    <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+      <a href="/" class="font-semibold tracking-tight">fast-qrcode</a>
+      <a href="/" class="text-sm text-muted-foreground hover:text-foreground">Home</a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-6 py-10">
+    <div class="mb-10">
+      <h1 class="text-3xl font-semibold tracking-tight">Create your QR card</h1>
+      <p class="mt-2 text-sm text-muted-foreground">Fill in the details. The card updates as you type.</p>
+    </div>
+
+    <div class="grid gap-12 lg:grid-cols-[1fr_420px]">
+      <!-- FORM -->
+      <section class="space-y-8">
+        <div>
+          <span class="label">Template</span>
+          <div class="seg" id="tplSeg">
+            <button type="button" data-tpl="brand" class="on">With brand</button>
+            <button type="button" data-tpl="plain">QR only</button>
+          </div>
+          <p id="tplHelp" class="help">Name and logo on the card, logo in the center of the code.</p>
+        </div>
+
+        <div id="nameWrap">
+          <label class="label" for="name">Name profile / business</label>
+          <input id="name" class="field" placeholder="e.g. Hiro Studio" maxlength="40" autocomplete="off" />
+        </div>
+
+        <div>
+          <div class="mb-3 flex items-center justify-between">
+            <span class="text-sm font-medium">Content</span>
+            <div class="seg" id="modeSeg">
+              <button type="button" data-mode="url" class="on">Link URL</button>
+              <button type="button" data-mode="text">Paste text</button>
+            </div>
+          </div>
+          <div id="urlWrap">
+            <input id="url" class="field" placeholder="https://yourwebsite.com" inputmode="url" autocomplete="off" />
+            <p class="help">Starts with https:// — we add it for you if you leave it out.</p>
+          </div>
+          <div id="textWrap" class="hidden">
+            <div id="editor"></div>
+            <p class="help">The QR code stores the plain text. Formatting is kept in your draft only.</p>
+          </div>
+        </div>
+
+        <div id="logoWrap">
+          <span class="label">Upload logo profile / business <span id="logoOpt" class="hidden font-normal text-muted-foreground">(optional)</span></span>
+          <div class="flex items-center gap-4">
+            <div id="logoPreview" class="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-xs text-muted-foreground">Logo</div>
+            <div class="flex gap-2">
+              <label class="btn btn-outline cursor-pointer">Choose image<input id="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" /></label>
+              <button id="logoRemove" type="button" class="btn btn-outline hidden">Remove</button>
+            </div>
+          </div>
+          <p id="logoHelp" class="help">PNG, JPG, WebP or SVG. Saved in this browser so you don't upload it again.</p>
+        </div>
+
+        <div>
+          <label class="label" for="pin">PIN to protect QR code <span class="font-normal text-muted-foreground">(optional)</span></label>
+          <input id="pin" class="field max-w-xs" type="password" placeholder="At least 4 characters" maxlength="24" autocomplete="new-password" />
+          <p id="pinMsg" class="help">Scanners must enter this PIN to see your link or text. The PIN is not saved.</p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <span class="text-sm font-medium">Choose color <span class="font-normal text-muted-foreground">(optional)</span></span>
+              <p class="help !mt-1">Turn on to add a colored border around your card.</p>
+            </div>
+            <button id="colorToggle" type="button" role="switch" aria-checked="false" aria-label="Use border color"
+                    class="relative h-6 w-11 shrink-0 rounded-full bg-neutral-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2">
+              <span id="colorKnob" class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"></span>
+            </button>
+          </div>
+
+          <div id="colorBody" class="mt-6 hidden space-y-5">
+            <div class="seg" id="colorSeg">
+              <button type="button" data-grad="0" class="on">Solid</button>
+              <button type="button" data-grad="1">Gradient</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <input id="c1" type="color" value="#0a0a0a" aria-label="Color 1" />
+              <input id="h1" class="field w-28 font-mono" value="#0a0a0a" maxlength="7" aria-label="Hex color 1" />
+              <span id="c2wrap" class="hidden items-center gap-3">
+                <input id="c2" type="color" value="#525252" aria-label="Color 2" />
+                <input id="h2" class="field w-28 font-mono" value="#525252" maxlength="7" aria-label="Hex color 2" />
+              </span>
+            </div>
+            <div id="angleWrap" class="hidden items-center gap-3 text-sm">
+              <label for="angle" class="w-28 text-muted-foreground">Gradient angle</label>
+              <input id="angle" type="range" min="0" max="360" value="135" class="w-48" />
+              <span id="angleVal" class="w-12 text-muted-foreground">135°</span>
+            </div>
+            <div id="presets" class="flex flex-wrap gap-2"></div>
+            <p class="help !mt-0">Type any hex code you already use.</p>
+          </div>
+
+          <div class="mt-6 flex items-center gap-3 text-sm">
+            <label for="radius" class="w-28 text-muted-foreground">Border radius</label>
+            <input id="radius" type="range" min="0" max="48" value="26" class="w-48" />
+            <span id="radiusVal" class="w-12 text-muted-foreground">26px</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PREVIEW -->
+      <aside>
+        <div class="lg:sticky lg:top-6">
+          <div class="dots flex justify-center rounded-xl border border-border bg-muted/60 py-10">
+            <div id="card" style="width:340px;padding:12px;border-radius:26px;background:#0a0a0a;font-family:Geist,Inter,system-ui,sans-serif">
+              <div style="background:#fff;border-radius:16px;padding:22px">
+                <div id="cardHead" style="display:flex;align-items:center;gap:12px">
+                  <div id="cardLogo" style="width:44px;height:44px;border-radius:999px;overflow:hidden;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;flex:none">H</div>
+                  <div style="min-width:0">
+                    <div id="cardName" style="font-size:15px;font-weight:600;line-height:1.2;color:#0a0a0a;word-break:break-word">Your name</div>
+                    <div style="font-size:12px;color:#737373;margin-top:2px">Scan to connect</div>
+                  </div>
+                </div>
+                <div id="qrBox" style="position:relative;margin-top:18px;border:1px solid #e5e5e5;border-radius:12px;padding:12px">
+                  <canvas id="qr" width="600" height="600" style="display:block;width:100%;height:auto"></canvas>
+                  <div id="hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#737373;text-align:center;padding:0 40px">Add a link or text to see your code</div>
+                </div>
+                <div id="cardFoot" style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:#737373">
+                  <span id="kind">Link</span><span>fast-qrcode</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p id="err" class="mt-3 hidden text-sm text-red-600"></p>
+
+          <div class="mt-5 grid grid-cols-2 gap-3">
+            <button id="dlPng" class="btn btn-primary">Download PNG</button>
+            <button id="dlPdf" class="btn btn-outline">Download PDF</button>
+          </div>
+          <button id="save" class="btn btn-outline mt-3 w-full">Save to this browser</button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- LIBRARY -->
+    <section class="mt-20 border-t border-border pt-10">
+      <h2 class="text-xl font-semibold tracking-tight">Saved cards</h2>
+      <p class="mt-1 text-sm text-muted-foreground">Stored only in this browser. Up to 8 cards.</p>
+      <div id="library" class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4"></div>
+      <p id="libEmpty" class="mt-6 text-sm text-muted-foreground">Nothing saved yet. Create a card and press “Save to this browser”.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 hidden -translate-x-1/2 rounded-md bg-primary px-4 py-2 text-sm text-white shadow-lg"></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = (s) => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { toast('Storage is full. Remove a saved card or use a smaller logo.'); return false; } }
+};
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+}
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const normHex = (v) => {
+  v = v.trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(v)) v = v.split('').map((c) => c + c).join('');
+  return /^[0-9a-f]{6}$/i.test(v) ? '#' + v.toLowerCase() : null;
+};
+const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* ---------- state ---------- */
+const S = Object.assign(
+  { tpl: 'brand', colorOn: false, radius: 26, mode: 'url', name: '', url: '', text: '', grad: false, c1: '#0a0a0a', c2: '#525252', angle: 135 },
+  store.get('hiro_draft', {})
+);
+let logo = store.get('hiro_logo', null);
+
+/* ---------- Quill ---------- */
+const quill = new Quill('#editor', {
+  theme: 'snow',
+  placeholder: 'Paste or write your text here…',
+  modules: { toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ align: [] }],
+    ['blockquote', 'link', 'clean']
+  ] }
+});
+if (S.text) quill.root.innerHTML = S.text;
+quill.on('text-change', () => { S.text = quill.root.innerHTML; update(); });
+
+/* ---------- crypto (PIN) ---------- */
+async function encryptPayload(obj, pin) {
+  const enc = new TextEncoder();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const km = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, km,
+    { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj))));
+  const all = new Uint8Array(28 + ct.length);
+  all.set(salt, 0); all.set(iv, 16); all.set(ct, 28);
+  return b64u(all);
+}
+
+/* ---------- QR drawing ---------- */
+if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs['UTF-8']) qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+
+// Pure black square modules on an integer pixel grid: sharp edges, no blur, no blobs.
+function drawQR(canvas, text, logoSrc) {
+  return new Promise((resolve) => {
+    const qr = qrcode(0, logoSrc ? 'H' : 'M');
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    const cell = Math.max(4, Math.ceil(1000 / n));
+    const size = cell * n;
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+
+    // clear zone for the logo, aligned to the module grid
+    let from = -1, to = -1;
+    if (logoSrc) {
+      let k = Math.round(n * 0.2);
+      if (k % 2 !== n % 2) k++;
+      from = (n - k) / 2; to = from + k;
+    }
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (!qr.isDark(r, c)) continue;
+      if (logoSrc && r >= from && r < to && c >= from && c < to) continue;
+      ctx.fillRect(c * cell, r * cell, cell, cell);
+    }
+    if (!logoSrc) return resolve();
+    const img = new Image();
+    img.onload = () => {
+      const pad = cell * 0.6, x = from * cell + pad, w = (to - from) * cell - pad * 2;
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(x, x, w, w, w * 0.14); ctx.clip();
+      ctx.drawImage(img, x, x, w, w);
+      ctx.restore();
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = logoSrc;
+  });
+}
+
+/* ---------- content ---------- */
+function getContent() {
+  if (S.mode === 'text') return quill.getText().trim();
+  let u = S.url.trim();
+  if (!u) return '';
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;
+  return u;
+}
+const bgCss = () => S.grad ? `linear-gradient(${S.angle}deg, ${S.c1}, ${S.c2})` : S.c1;
+
+/* ---------- render ---------- */
+let tok = 0;
+async function render() {
+  const my = ++tok;
+  const content = getContent();
+  const pin = $('#pin').value.trim();
+  const pinBad = pin.length > 0 && pin.length < 4;
+  $('#pinMsg').style.color = pinBad ? '#dc2626' : '';
+  $('#pinMsg').textContent = pinBad
+    ? 'PIN needs at least 4 characters.'
+    : 'Scanners must enter this PIN to see your link or text. The PIN is not saved.';
+
+  // template
+  const plain = S.tpl === 'plain';
+  $('#cardHead').style.display = plain ? 'none' : 'flex';
+  $('#cardFoot').style.display = plain ? 'none' : 'flex';
+  $('#qrBox').style.marginTop = plain ? '0' : '18px';
+  $('#qrBox').style.padding = plain ? '16px' : '12px';
+  const useLogo = logo;
+
+  // card chrome
+  const card = $('#card'), inner = card.firstElementChild, rad = S.radius;
+  if (S.colorOn) {
+    card.style.background = bgCss(); card.style.border = 'none'; card.style.padding = '12px';
+    inner.style.borderRadius = Math.max(rad - 12, 4) + 'px';
+  } else {
+    card.style.background = '#fff'; card.style.border = '1px solid #e5e5e5'; card.style.padding = '0';
+    inner.style.borderRadius = rad + 'px';
+  }
+  card.style.borderRadius = rad + 'px';
+  $('#cardName').textContent = S.name.trim() || 'Your name';
+  const cl = $('#cardLogo');
+  if (logo) { cl.innerHTML = `<img src="${logo}" style="width:100%;height:100%;object-fit:cover" />`; cl.style.background = '#fff'; }
+  else { cl.textContent = (S.name.trim()[0] || 'H').toUpperCase(); cl.style.background = '#0a0a0a'; }
+
+  let payload = content, kind = S.mode === 'url' ? 'Link' : 'Text';
+  try {
+    if (content && pin && !pinBad) {
+      const token = await encryptPayload({ t: S.mode, v: content, n: S.name.trim() }, pin);
+      if (my !== tok) return;
+      payload = location.origin + '/unlock#' + token;
+      kind = 'PIN protected';
+    }
+    const empty = !content;
+    await drawQR($('#qr'), empty ? 'fast-qrcode' : payload, useLogo);
+    if (my !== tok) return;
+    $('#qr').style.opacity = empty ? 0.12 : 1;
+    $('#hint').style.display = empty ? 'flex' : 'none';
+    $('#kind').textContent = kind;
+    $('#err').classList.add('hidden');
+  } catch (e) {
+    $('#err').textContent = 'This content is too long for one QR code. Shorten the text or use a link.';
+    $('#err').classList.remove('hidden');
+  }
+}
+const renderSoon = debounce(render, 250);
+
+function update() {
+  const { pin, ...draft } = S; // PIN is never stored
+  store.set('hiro_draft', draft);
+  renderSoon();
+}
+
+/* ---------- form wiring ---------- */
+function syncUI() {
+  const plain = S.tpl === 'plain';
+  document.querySelectorAll('#tplSeg button').forEach((b) => b.classList.toggle('on', b.dataset.tpl === S.tpl));
+  $('#nameWrap').classList.toggle('hidden', plain);
+  $('#tplHelp').textContent = plain
+    ? 'Only the QR code inside a colored border. A logo in the center is optional.'
+    : 'Name and logo on the card, logo in the center of the code.';
+  $('#logoOpt').classList.toggle('hidden', !plain);
+  $('#logoHelp').textContent = plain
+    ? 'Shown in the center of the QR code only. Skip it for a plain code.'
+    : 'PNG, JPG, WebP or SVG. Saved in this browser so you don\'t upload it again.';
+  $('#colorBody').classList.toggle('hidden', !S.colorOn);
+  $('#colorToggle').setAttribute('aria-checked', String(S.colorOn));
+  $('#colorToggle').classList.toggle('bg-primary', S.colorOn);
+  $('#colorToggle').classList.toggle('bg-neutral-300', !S.colorOn);
+  $('#colorKnob').style.transform = S.colorOn ? 'translateX(20px)' : 'none';
+  $('#radius').value = S.radius; $('#radiusVal').textContent = S.radius + 'px';
+  $('#name').value = S.name;
+  $('#url').value = S.url;
+  document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === S.mode));
+  $('#urlWrap').classList.toggle('hidden', S.mode !== 'url');
+  $('#textWrap').classList.toggle('hidden', S.mode !== 'text');
+  document.querySelectorAll('#colorSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.grad === '1') === S.grad));
+  $('#c2wrap').classList.toggle('hidden', !S.grad); $('#c2wrap').classList.toggle('flex', S.grad);
+  $('#angleWrap').classList.toggle('hidden', !S.grad); $('#angleWrap').classList.toggle('flex', S.grad);
+  $('#c1').value = S.c1; $('#h1').value = S.c1;
+  $('#c2').value = S.c2; $('#h2').value = S.c2;
+  $('#angle').value = S.angle; $('#angleVal').textContent = S.angle + '°';
+  const has = !!logo;
+  $('#logoRemove').classList.toggle('hidden', !has);
+  $('#logoPreview').innerHTML = has ? `<img src="${logo}" class="h-full w-full object-cover" />` : 'Logo';
+}
+
+$('#name').addEventListener('input', (e) => { S.name = e.target.value; update(); });
+$('#url').addEventListener('input', (e) => { S.url = e.target.value; update(); });
+$('#pin').addEventListener('input', renderSoon);
+$('#colorToggle').addEventListener('click', () => { S.colorOn = !S.colorOn; syncUI(); update(); });
+$('#radius').addEventListener('input', (e) => { S.radius = +e.target.value; $('#radiusVal').textContent = S.radius + 'px'; update(); });
+$('#tplSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.tpl = b.dataset.tpl; syncUI(); update();
+});
+$('#modeSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.mode = b.dataset.mode; syncUI(); update();
+});
+$('#colorSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.grad = b.dataset.grad === '1'; syncUI(); update();
+});
+[['c1', 'h1'], ['c2', 'h2']].forEach(([cp, hx]) => {
+  $('#' + cp).addEventListener('input', (e) => { S[cp] = e.target.value; $('#' + hx).value = e.target.value; update(); });
+  $('#' + hx).addEventListener('input', (e) => {
+    const v = normHex(e.target.value);
+    if (v) { S[cp] = v; $('#' + cp).value = v; update(); }
+  });
+  $('#' + hx).addEventListener('blur', (e) => { e.target.value = S[cp]; });
+});
+$('#angle').addEventListener('input', (e) => { S.angle = +e.target.value; $('#angleVal').textContent = S.angle + '°'; update(); });
+
+// presets
+const PRESETS = [
+  { g: 0, c1: '#0a0a0a' }, { g: 0, c1: '#2563eb' }, { g: 0, c1: '#059669' }, { g: 0, c1: '#dc2626' }, { g: 0, c1: '#d97706' }, { g: 0, c1: '#7c3aed' },
+  { g: 1, c1: '#0a0a0a', c2: '#737373' }, { g: 1, c1: '#2563eb', c2: '#7c3aed' }, { g: 1, c1: '#f97316', c2: '#ec4899' }, { g: 1, c1: '#059669', c2: '#0ea5e9' }
+];
+PRESETS.forEach((p) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.setAttribute('aria-label', 'Color preset');
+  b.className = 'h-7 w-7 rounded-full border border-border';
+  b.style.background = p.g ? `linear-gradient(135deg, ${p.c1}, ${p.c2})` : p.c1;
+  b.onclick = () => { S.grad = !!p.g; S.c1 = p.c1; if (p.g) S.c2 = p.c2; S.angle = 135; syncUI(); update(); };
+  $('#presets').appendChild(b);
+});
+
+/* ---------- logo (localStorage) ---------- */
+$('#logoFile').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const s = 192, c = document.createElement('canvas'); c.width = c.height = s;
+      const ctx = c.getContext('2d');
+      const side = Math.min(img.width || s, img.height || s) || s;
+      ctx.drawImage(img, ((img.width || s) - side) / 2, ((img.height || s) - side) / 2, side, side, 0, 0, s, s);
+      logo = c.toDataURL('image/png');
+      store.set('hiro_logo', logo);
+      syncUI(); render();
+    };
+    img.onerror = () => toast('Could not read that image.');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+});
+$('#logoRemove').addEventListener('click', () => {
+  logo = null; localStorage.removeItem('hiro_logo'); syncUI(); render();
+});
+
+/* ---------- export ---------- */
+const slug = () => (S.tpl === 'plain' ? 'qr-code' : (S.name.trim() || 'qr-card')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'qr-card';
+function ready() {
+  if (!getContent()) { toast('Add a link or text first.'); return false; }
+  if (!$('#err').classList.contains('hidden')) { toast('Shorten your content first.'); return false; }
+  const pin = $('#pin').value.trim();
+  if (pin && pin.length < 4) { toast('PIN needs at least 4 characters.'); return false; }
+  return true;
+}
+async function snap(scale) {
+  await render(); // make sure preview is current (and PIN token matches)
+  await new Promise((r) => setTimeout(r, 120)); // let the logo finish drawing
+  return html2canvas($('#card'), { scale, backgroundColor: null, useCORS: true });
+}
+function download(url, name) {
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+$('#dlPng').addEventListener('click', async () => {
+  if (!ready()) return;
+  const c = await snap(3);
+  download(c.toDataURL('image/png'), slug() + '.png');
+});
+$('#dlPdf').addEventListener('click', async () => {
+  if (!ready()) return;
+  const c = await snap(3);
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const w = 100, h = w * (c.height / c.width), x = (210 - w) / 2, y = 40;
+  pdf.addImage(c.toDataURL('image/png'), 'PNG', x, y, w, h);
+  pdf.save(slug() + '.pdf');
+});
+
+/* ---------- library ---------- */
+function renderLibrary() {
+  const items = store.get('hiro_library', []);
+  const box = $('#library'); box.innerHTML = '';
+  $('#libEmpty').classList.toggle('hidden', items.length > 0);
+  items.forEach((it) => {
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div class="dots flex justify-center rounded-lg border border-border bg-muted/60 p-4"><img src="${it.img}" alt="" class="w-full max-w-[160px]" /></div>
+      <p class="mt-3 truncate text-sm font-medium"></p>
+      <p class="text-xs text-muted-foreground">${it.kind} · ${new Date(it.date).toLocaleDateString()}</p>
+      <div class="mt-3 flex gap-2">
+        <button class="btn btn-outline !h-8 flex-1 !px-3" data-a="dl">Download</button>
+        <button class="btn btn-outline !h-8 !px-3" data-a="rm">Remove</button>
+      </div>`;
+    el.querySelector('p').textContent = it.name || 'Untitled';
+    el.querySelector('[data-a=dl]').onclick = () => download(it.img, (it.name || 'qr-card').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.png');
+    el.querySelector('[data-a=rm]').onclick = () => { store.set('hiro_library', items.filter((x) => x.id !== it.id)); renderLibrary(); };
+    box.appendChild(el);
+  });
+}
+$('#save').addEventListener('click', async () => {
+  if (!ready()) return;
+  const c = await snap(1.5);
+  const items = store.get('hiro_library', []);
+  items.unshift({ id: Date.now(), name: S.tpl === 'plain' ? 'QR only' : S.name.trim(), kind: $('#kind').textContent, date: Date.now(), img: c.toDataURL('image/png') });
+  if (store.set('hiro_library', items.slice(0, 8))) { toast('Saved to this browser.'); renderLibrary(); }
+});
+
+/* ---------- init ---------- */
+syncUI(); renderLibrary(); render();
+</script>
+</body>
+</html>

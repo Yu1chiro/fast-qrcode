@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>fast-qrcode — QR cards without an account</title>
+  <meta name="description" content="Make a clean, professional QR code card for your profile or business. No sign-in. Everything stays in your browser." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          border: '#e5e5e5', background: '#ffffff', foreground: '#0a0a0a',
+          muted: { DEFAULT: '#f5f5f5', foreground: '#737373' },
+          primary: { DEFAULT: '#171717', foreground: '#fafafa' }
+        },
+        fontFamily: { sans: ['Geist', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
+      } }
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer components {
+      .btn { @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-10 px-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2; }
+      .btn-primary { @apply bg-primary text-primary-foreground hover:bg-neutral-700; }
+      .btn-outline { @apply border border-border bg-white hover:bg-muted; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+</head>
+<body class="bg-background text-foreground font-sans antialiased">
+
+  <header class="border-b border-border">
+    <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
+      <a href="/" class="font-semibold tracking-tight">fast-qrcode</a>
+      <nav class="flex items-center gap-6 text-sm text-muted-foreground">
+        <a href="#features" class="hidden hover:text-foreground sm:block">Features</a>
+        <a href="#how" class="hidden hover:text-foreground sm:block">How it works</a>
+        <a href="#faq" class="hidden hover:text-foreground sm:block">FAQ</a>
+        <a href="/generate-qr" class="btn btn-primary !h-9 !px-4 text-white">Create QR</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="mx-auto grid max-w-5xl items-center gap-14 px-6 py-20 md:grid-cols-2 md:py-28">
+      <div>
+        <h1 class="text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
+          A QR code card that looks like your business.
+        </h1>
+        <p class="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+          Add your name, a link or text, your logo and a brand color. Download a clean card as PNG or PDF. No account, no server, no tracking.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="/generate-qr" class="btn btn-primary">Create your QR card</a>
+          <a href="#how" class="btn btn-outline">See how it works</a>
+        </div>
+        <p class="mt-5 text-sm text-muted-foreground">Free. Your data never leaves this browser.</p>
+      </div>
+
+      <div class="flex justify-center rounded-xl border border-border bg-muted/60 py-12"
+           style="background-image:radial-gradient(#d4d4d4 1px,transparent 1px);background-size:18px 18px">
+        <div id="heroCard" style="width:280px;padding:10px;border-radius:24px;background:linear-gradient(135deg,#0a0a0a,#737373);box-shadow:0 20px 40px -20px rgba(0,0,0,.35)">
+          <div style="background:#fff;border-radius:15px;padding:20px">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">F</div>
+              <div>
+                <p class="text-sm font-semibold leading-tight">fast-qrcode</p>
+                <p class="text-xs text-muted-foreground">Scan to connect</p>
+              </div>
+            </div>
+            <div class="mt-4 rounded-lg border border-border p-3">
+              <canvas id="heroQr" width="480" height="480" class="block w-full"></canvas>
+            </div>
+            <div class="mt-3 flex justify-between text-[11px] text-muted-foreground">
+              <span>Link</span><span>fast-qrcode</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="border-t border-border">
+      <div class="mx-auto max-w-5xl px-6 py-20">
+        <h2 class="max-w-lg text-2xl font-semibold tracking-tight sm:text-3xl">Everything a business card QR needs, nothing it doesn't.</h2>
+        <div class="mt-12 grid border-l border-t border-border sm:grid-cols-2 lg:grid-cols-3">
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">No sign-in</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Open the page and start. There is no account, no email and no password.</p>
+          </div>
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">Link or rich text</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Point to a URL or write a note in a text editor with headings, lists and styles.</p>
+          </div>
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">Your logo on the card</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Upload a logo once. It sits in the card header and in the center of the code.</p>
+          </div>
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">Optional PIN</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Lock the content. Anyone who scans must enter the PIN to see it.</p>
+          </div>
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">Brand color border</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Pick a color, type a hex code or blend two colors into a gradient.</p>
+          </div>
+          <div class="border-b border-r border-border p-6">
+            <h3 class="font-medium">PNG and PDF</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Download a sharp card ready for print, email or a presentation slide.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How -->
+    <section id="how" class="border-t border-border bg-muted/50">
+      <div class="mx-auto max-w-5xl px-6 py-20">
+        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">Three steps, under a minute.</h2>
+        <ol class="mt-12 grid gap-10 md:grid-cols-3">
+          <li>
+            <span class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-sm font-medium">1</span>
+            <h3 class="mt-4 font-medium">Add your details</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Enter your name or business, then a link or some text. Add a logo if you have one.</p>
+          </li>
+          <li>
+            <span class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-sm font-medium">2</span>
+            <h3 class="mt-4 font-medium">Choose a color</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">The preview updates as you type, so you see the final card all the time.</p>
+          </li>
+          <li>
+            <span class="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-sm font-medium">3</span>
+            <h3 class="mt-4 font-medium">Download the card</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Save it as PNG or PDF, or keep it in this browser to download again later.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="border-t border-border">
+      <div class="mx-auto max-w-3xl px-6 py-20">
+        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">Questions</h2>
+        <div class="mt-10 divide-y divide-border border-y border-border">
+          <details class="group py-5">
+            <summary class="flex cursor-pointer list-none items-center justify-between font-medium">Where is my data stored?<span class="text-muted-foreground transition group-open:rotate-45">+</span></summary>
+            <p class="mt-3 text-sm leading-relaxed text-muted-foreground">In your browser's local storage. Nothing is sent to a server, so clearing your browser data removes your saved cards and logo.</p>
+          </details>
+          <details class="group py-5">
+            <summary class="flex cursor-pointer list-none items-center justify-between font-medium">Do the QR codes expire?<span class="text-muted-foreground transition group-open:rotate-45">+</span></summary>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">No. A code holds your link or text directly, so it works as long as that link works. PIN-locked codes need this site to stay online to open the unlock page.</p>
+          </details>
+          <details class="group py-5">
+            <summary class="flex cursor-pointer list-none items-center justify-between font-medium">How secure is the PIN?<span class="text-muted-foreground transition group-open:rotate-45">+</span></summary>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">Content is encrypted with your PIN inside the code. A longer PIN is safer, because someone who has the code can try guesses offline.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="border-t border-border">
+      <div class="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 px-6 py-16 sm:flex-row sm:items-center">
+        <h2 class="text-2xl font-semibold tracking-tight">Ready to make yours?</h2>
+        <a href="/generate-qr" class="btn btn-primary">Create your QR card</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-border">
+    <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-6 text-sm text-muted-foreground">
+      <span>ヒロ・８１１</span><span>&copy; 2026</span>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const qr = qrcode(0, 'M');
+      qr.addData('https://fast-qrcode');
+      qr.make();
+      const c = document.getElementById('heroQr'), ctx = c.getContext('2d');
+      const n = qr.getModuleCount(), cell = Math.ceil(800 / n);
+      c.width = c.height = cell * n;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = '#000';
+      for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) {
+        if (qr.isDark(r, k)) ctx.fillRect(k * cell, r * cell, cell, cell);
+      }
+    })();
+  </script>
+</body>
+</html>
